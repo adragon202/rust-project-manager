@@ -1,6 +1,6 @@
 {
-  "name": "rust-crate-installer",
-  "displayName": "Rust Crate Installer",
+  "name": "rust-project-manager",
+  "displayName": "Rust Project Manager",
   "description": "Provides easy interface for interacting with crates.io",
   "version": "0.0.1",
   "engines": {
@@ -14,19 +14,19 @@
   "contributes": {
     "commands": [
       {
-        "command": "rust-crate-installer.cargoAdd",
+        "command": "rust-project-manager.cargoAdd",
         "title": "Rust: Add Crate"
       },
       {
-        "command": "rust-crate-installer.setTarget",
+        "command": "rust-project-manager.setTarget",
         "title": "Rust: Set Target"
       },
       {
-        "command": "rust-crate-installer.newBin",
+        "command": "rust-project-manager.newBin",
         "title": "Rust: New Application Project"
       },
       {
-        "command": "rust-crate-installer.newLib",
+        "command": "rust-project-manager.newLib",
         "title": "Rust: New Library Project"
       }
     ]

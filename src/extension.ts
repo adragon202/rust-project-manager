@@ -13,10 +13,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	let cargoAddDisposable = vscode.commands.registerCommand('rust-crate-installer.cargoAdd', cargoAdd);
-	let setTargetDisposable = vscode.commands.registerCommand('rust-crate-installer.setTarget', setTarget);
-	let newBinDisposable = vscode.commands.registerCommand('rust-crate-installer.newBin', newBin);
-	let newLibDisposable = vscode.commands.registerCommand('rust-crate-installer.newLib', newLib);
+	let cargoAddDisposable = vscode.commands.registerCommand('rust-project-manager.cargoAdd', cargoAdd);
+	let setTargetDisposable = vscode.commands.registerCommand('rust-project-manager.setTarget', setTarget);
+	let newBinDisposable = vscode.commands.registerCommand('rust-project-manager.newBin', newBin);
+	let newLibDisposable = vscode.commands.registerCommand('rust-project-manager.newLib', newLib);
 
 	context.subscriptions.push(cargoAddDisposable);
 	context.subscriptions.push(setTargetDisposable);
@@ -69,6 +69,8 @@ async function setTarget(): Promise<void>{
 	let cmd = new rustc.Print();
 	cmd.output = 'target-list';
 	let targets = await cmd.execute();
+	let systemTarget = 'system';
+	targets.values.push(systemTarget);
 	//Implement QuickPick for search
 	let quickPick = vscode.window.createQuickPick();
 	quickPick.items = targets.values.map(v => {
@@ -93,7 +95,8 @@ async function setTarget(): Promise<void>{
 			//Edit [build].target
 			if (!config.config) { config.config = {}; }
 			if (!config.config.build) { config.config.build = {}; }
-			config.config.build.target = selection;
+			if (selection === systemTarget) { config.config.build.target = undefined; }
+			else { config.config.build.target = selection; }
 			//Save changes to config.toml
 			saveTOMLFile(config.path, config.config);
 			vscode.window.showInformationMessage('Updated Config File Target');

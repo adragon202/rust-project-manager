@@ -1,71 +1,45 @@
-# rust-crate-installer README
+# rust-project-manager README
 
-This is the README for your extension "rust-crate-installer". After writing up a brief description, we recommend including the following sections.
+The rust-project-manager exists to reduce the amount of command lines that users need to know to get a project up and running.
 
 ## Features
+All commands are accessible from the command prompt accessed by Ctrl+Shift+P.
+Commands target one workspace at a time, and will prompt if multiple workspaces are open.
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+> Rust: Add Crate
+Integrates with the search command to provide search functionality to find and add crates to your project.
 
-For example if there is an image subfolder under your extension project workspace:
+> Rust: Set Target
+Provides list of known targets and allows user to set the default target of their project.
 
-\!\[feature X\]\(images/feature-x.png\)
+> Rust: New Application Project
+Creates a new application/binary project in one of the open workspaces.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+> Rust: New Library Project
+Creates a new library crate project in one of the open workspacess.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+Users will need to install rust and cargo in order to benefit from commands.
+The commands also need to be part of the $PATH environment variable so that they can be executed from anywhere.
+
+It is also recommended that users install other extensions to handle syntax highlighting, and project build and debugging.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+None at this time.
 
-For example:
+## Future Plans
 
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+* Implementing support for starting embedded projects
+* Expanding on support for setting target and target build flags
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+None at this time
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release

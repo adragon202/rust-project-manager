@@ -48,6 +48,9 @@ interface KnownTargetInformation{
 
 /** Known targets and their descriptions */
 export const KNOWN_TARGETS: Map<string, KnownTargetInformation> = new Map<string, KnownTargetInformation>([
+    ['system', {
+        description: 'Resets the target to compile for current system',
+    }],
     ['aarch64-apple-ios-sim', {
         tier: 2,
         description: 'Apple iOS Simulator for ARM64',
