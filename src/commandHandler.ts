@@ -42,4 +42,10 @@ export abstract class CommandHandler{
             });
         });
     }//end ExecuteCommand(): Promise<string>
+
+    spawnCommand(): process.ChildProcessWithoutNullStreams{
+        let command = this.getCommand();
+        console.log(`Spawning '${command}'`);
+        return process.spawn(command);
+    }
 }//end export abstract class CommandHandler

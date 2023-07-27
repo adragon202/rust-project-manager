@@ -5,6 +5,9 @@ import * as crate from './cargo';
 import * as rustc from './rustc';
 import * as toml from '@iarna/toml';
 import * as fs from 'fs';
+import * as process from 'process';
+import * as path from 'path';
+import { Repository, RepositoryFile, Search, SearchResults, SearchType } from './gitHub';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -17,11 +20,15 @@ export function activate(context: vscode.ExtensionContext) {
 	let setTargetDisposable = vscode.commands.registerCommand('rust-project-manager.setTarget', setTarget);
 	let newBinDisposable = vscode.commands.registerCommand('rust-project-manager.newBin', newBin);
 	let newLibDisposable = vscode.commands.registerCommand('rust-project-manager.newLib', newLib);
+	let newBinTemplateDisposable = vscode.commands.registerCommand('rust-project-manager.newBinTemplate', newBinTemplate);
+	let newLibTemplateDisposable = vscode.commands.registerCommand('rust-project-manager.newLibTemplate', newLibTemplate);
 
 	context.subscriptions.push(cargoAddDisposable);
 	context.subscriptions.push(setTargetDisposable);
 	context.subscriptions.push(newBinDisposable);
 	context.subscriptions.push(newLibDisposable);
+	context.subscriptions.push(newBinTemplateDisposable);
+	context.subscriptions.push(newLibTemplateDisposable);
 }
 
 // This method is called when your extension is deactivated
@@ -115,11 +122,14 @@ async function setTarget(): Promise<void>{
 async function newBin(): Promise<void>{
 	//Prompt for Folder
 	let workspace = await getTargetWorkspace();
-	if (!workspace) { return; }
+	if (!workspace) { 
+		vscode.window.showInformationMessage(`Create a new workspace where crate will be created.`);
+		return; 
+	}
 	try{
 		let cmd = new crate.NewCrate(workspace.uri.fsPath);
 		cmd.createDirectory = false;
-		cmd.template = crate.CrateTemplate.bin;
+		cmd.crateType = crate.CrateType.bin;
 		cmd.versionControl = await getVersionControl();
 		await cmd.execute();
 		vscode.window.showInformationMessage('Generated new Rust Crate Application');
@@ -136,11 +146,14 @@ async function newBin(): Promise<void>{
 async function newLib(): Promise<void>{
 	//Prompt for Folder
 	let workspace = await getTargetWorkspace();
-	if (!workspace) { return; }
+	if (!workspace) { 
+		vscode.window.showInformationMessage(`Create a new workspace where crate will be created.`);
+		return; 
+	}
 	try{
 		let cmd = new crate.NewCrate(workspace.uri.fsPath);
 		cmd.createDirectory = false;
-		cmd.template = crate.CrateTemplate.lib;
+		cmd.crateType = crate.CrateType.lib;
 		cmd.versionControl = await getVersionControl();
 		await cmd.execute();
 		vscode.window.showInformationMessage('Generated new Rust Crate Library');
@@ -149,6 +162,117 @@ async function newLib(): Promise<void>{
 		vscode.window.showInformationMessage(((err as Error)?.message as string) || (err as string));
 	}
 }//end async function newLib(): Promise<void>
+
+/**
+ * Handler for newBinTemplate command. Prompts user for path to template and template variables.
+ */
+async function newBinTemplate(): Promise<void>{
+	//Prompt for Folder
+	let workspace: vscode.WorkspaceFolder = await getTargetWorkspace() as vscode.WorkspaceFolder;
+	if (!workspace) { 
+		vscode.window.showInformationMessage(`Create a new workspace where crate will be created.`);
+		return; 
+	}
+	//Prompt for Template
+	let templateRepo = await promptGitHubTemplate();
+	if (!templateRepo) { return; }
+	vscode.window.showInformationMessage(`Adding ${templateRepo.name}`);
+	//Evaluate Project Name and Folder
+	let targetFolder = workspace.uri.fsPath;
+	let crateName = path.parse(targetFolder).name;
+	targetFolder = path.dirname(targetFolder);
+	//Build Command
+	let cmd = new crate.Generate(crateName);
+	cmd.crateType = crate.CrateType.bin;
+	cmd.gitRepoPath = templateRepo.clone_url;
+	//Configure responder to placeholder prompts
+	cmd.getValueHandler = async (spawn, prompt) => 
+	{
+		try{
+			console.log(prompt);
+			let value = await promptForString('Rust Bin From Template Prompt', prompt);
+			if (value){
+				return value;
+			}else{
+				console.log(`Killing Command Spawn after undefined response`);
+				throw new Error(`User Cancelled`);
+			}
+		}catch(err){
+			console.log(`Error in prompting user`);
+			console.log(err);
+			vscode.window.showErrorMessage(`Template Project Cancelled`);
+			spawn.kill();
+			throw err;
+		}
+	};
+	//Execute Command
+	let currentDir = process.cwd();
+	try{
+		process.chdir(targetFolder);
+		let result = await cmd.execute();
+	}catch(err){
+		console.log(err);
+		vscode.window.showInformationMessage(((err as Error)?.message as string) || (err as string));
+	}finally{
+		process.chdir(currentDir);
+	}
+}//end async function newBinTemplate(): Promise<void>
+
+/**
+ * Handler for newLibTemplate command. Prompts user for path to template and template variables.
+ */
+async function newLibTemplate(): Promise<void>{
+	//Prompt for Folder
+	let workspace: vscode.WorkspaceFolder = await getTargetWorkspace() as vscode.WorkspaceFolder;
+	if (!workspace) { 
+		vscode.window.showInformationMessage(`Create a new workspace where crate will be created.`);
+		return; 
+	}
+	//Prompt for Template
+	let templateRepo = await promptGitHubTemplate();
+	if (!templateRepo) { return; }
+	vscode.window.showInformationMessage(`Adding ${templateRepo.name}`);
+	//Evaluate Project Name and Folder
+	let targetFolder = workspace.uri.fsPath;
+	let crateName = path.parse(targetFolder).name;
+	targetFolder = path.dirname(targetFolder);
+	//Build Command
+	let cmd = new crate.Generate(crateName);
+	cmd.crateType = crate.CrateType.lib;
+	cmd.gitRepoPath = templateRepo.clone_url;
+	//Configure responder to placeholder prompts
+	cmd.getValueHandler = async (spawn, prompt) => 
+	{
+		try{
+			console.log(prompt);
+			let value = await promptForString('Rust Bin From Template Prompt', prompt);
+			if (value){
+				return value;
+			}else{
+				console.log(`Killing Command Spawn after undefined response`);
+				throw new Error(`User Cancelled`);
+			}
+		}catch(err){
+			console.log(`Error in prompting user`);
+			console.log(err);
+			vscode.window.showErrorMessage(`Template Project Cancelled`);
+			spawn.kill();
+			throw err;
+		}
+	};
+	//Execute Command
+	let currentDir = process.cwd();
+	try{
+		process.chdir(targetFolder);
+		console.log(`Executing from ${process.cwd()}`);
+		let result = await cmd.execute();
+	}catch(err){
+		console.log(err);
+		vscode.window.showInformationMessage(((err as Error)?.message as string) || (err as string));
+	}finally{
+		process.chdir(currentDir);
+	}
+}//end async function newLibTemplate(): Promise<void>
 
 /**
  * Prompts user to select a Version Control
@@ -288,3 +412,87 @@ async function saveTOMLFile(path: string, config: any): Promise<void>{
 	}), encoder.encode(content));
 }//end async function writeTOMLFile(path: string, config: any): Promise<void>
 
+/**
+ * Queries GitHub for all Repo's that are Cargo-Generate Templates
+ * @returns Array of repositories, paged 100 at a time.
+ */
+async function getGitHubTemplates(): Promise<Repository[]>{
+	let cmd = new  Search(SearchType.repositories);
+	cmd.topics = 'cargo-generate';
+	cmd.languages = 'rust';
+	cmd.perPage = 100;
+	cmd.page = 0;
+	console.log(`Searching for Git Repo's with tag ${cmd.topics} and language ${cmd.languages}`);
+	let results = await cmd.search<Repository>();
+	let totalResults = results.items;
+	console.log(`Found ${results.total_count} Repos. Received ${totalResults.length}`);
+	while(results.incomplete_results && totalResults.length < results.total_count){
+		cmd.page++;
+		results = await cmd.search();
+		totalResults.push(...results.items);
+		console.log(`Found ${results.total_count} Repos. Received ${totalResults.length}`);
+	}
+	return totalResults;
+}//end async function getGitHubTemplates(): Promise<SearchResults>
+
+/** Prompts user to select from available git hub templates */
+async function promptGitHubTemplate(): Promise<Repository | undefined>{
+	return new Promise<Repository | undefined>((resolve, reject) => {
+		//Implement QuickPick for search
+		let quickPick = vscode.window.createQuickPick();
+		//Populate Quickpick from Github
+		let templates: Repository[] = [];
+		vscode.window.showInformationMessage(`Getting Templates from GitHub`);
+		getGitHubTemplates().then(t => {
+			console.log(`Retrieved ${t.length} Templates from Github`);
+			templates = t;
+			quickPick.items = t.map(i => {
+				return {
+					label: i.name,
+					detail: i.clone_url,
+					description: i.description,
+				};
+			});
+		}).catch(err => {
+			console.log(err);
+			vscode.window.showInformationMessage(((err as Error)?.message as string) || (err as string));
+		});
+		//Get 
+		quickPick.onDidAccept(async () => {
+			//Execute Add Command
+			let result = quickPick.selectedItems[0].detail;
+			resolve(templates.find(t => t.clone_url === result));
+			//Finalize QuickPick
+			quickPick.dispose();
+		});
+		//Show QuickPick for Search
+		quickPick.show();
+	});
+}//end async function selectGitHubTemplate(): Promise<Repository | undefined>
+
+/** Prompts the user for a string entry. */
+async function promptForString(title: string, prompt: string): Promise<string | undefined> {
+	return new Promise<string | undefined>((resolve, reject) => {
+		//Implement QuickPick for prompt
+		let quickPick = vscode.window.createQuickPick();
+		quickPick.title = title;
+		quickPick.placeholder = prompt;
+		//Get 
+		quickPick.onDidAccept(async () => {
+			//Respond with entry
+			let result = quickPick.selectedItems.length > 0 ? quickPick.selectedItems[0].label : undefined;
+			resolve(result);
+			//Finalize QuickPick
+			quickPick.dispose();
+		});
+		quickPick.onDidChangeValue(async (value) => {
+			//Set value as sole item in quickpick
+			quickPick.items = value ? [{
+				label: value
+			}] : [];
+		});
+		quickPick.onDidHide(() => reject());
+		//Show QuickPick for Search
+		quickPick.show();
+	});
+}//end async function promptForString(): string

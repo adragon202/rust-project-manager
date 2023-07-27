@@ -1,7 +1,8 @@
 import { CommandHandler } from './commandHandler';
+import * as child_process from 'child_process';
 
 /** Pre-existing Crate Templates accepted by CargoNew */
-export enum CrateTemplate{
+export enum CrateType{
     /** (Default) Binary Application Executable */
     bin,
     /** Library extension */
@@ -23,8 +24,8 @@ export enum CrateVersionControl{
  * Create a new cargo package at <path>
  */
 export class NewCrate extends CommandHandler{
-    /** Template to use for new Crate */
-    template?: CrateTemplate;
+    /** Type to use for new Crate */
+    crateType?: CrateType;
     /** Path to where the new crate will exist locally */
     path: string;
     /** Edition to set for the crate generated. Defaults to latest 2021 */
@@ -37,10 +38,10 @@ export class NewCrate extends CommandHandler{
     createDirectory: boolean = true;
     /** Override a configuration value */
     config: Map<string, string> = new Map<string, string>();
-    constructor(path: string, template?: CrateTemplate){
+    constructor(path: string, crateType?: CrateType){
         super();
         this.path = path;
-        this.template = template;
+        this.crateType = crateType;
     }
     getCommand(): string{
         let cmd: string = `cargo ${(this.createDirectory ? 'new' : 'init')}`;
@@ -56,8 +57,8 @@ export class NewCrate extends CommandHandler{
         for(let [key, value] of this.config){
             cmd += ` --config ${key}=${value}`;
         }
-        if (this.template !== undefined && this.template !== null){
-            cmd += ` --${CrateTemplate[this.template]}`;
+        if (this.crateType !== undefined && this.crateType !== null){
+            cmd += ` --${CrateType[this.crateType]}`;
         }
         let pathSubParts = this.path?.split('\\');
         if ((pathSubParts?.length ?? 0) > 0){
@@ -76,6 +77,141 @@ export class NewCrate extends CommandHandler{
         let stdout = await this.executeCommand();
         console.log(stdout);
     }//end Execute<T>(): Promise<T>
+}
+
+/**
+ * Makes a new project from a template
+ */
+export class Generate{
+    /** Type to use for new Crate */
+    crateType?: CrateType;
+    /** Directory to create / project name. Kebab-case is enforced unless forceName is true. */
+    name: string;
+    /** If true then don't convert the project name to kebab-case before creating the directory. */
+    forceName: boolean = false;
+    /** URL, Relative Path, ABsolute Path, or 'owner/repo' abbreviated GitHub URL of the repo to clone the template from. */
+    gitRepoPath?: string;
+    /** Branch to use when installing from git */
+    gitBranch?: string;
+    /** Tag to use when installing from git */
+    gitTag?: string;
+    /** Local Path to copy the template from. */
+    localTemplate?: string;
+    /** Generatea  favorite template as defined in the config (generateConfigFile). if undefined, use in place of the git option, otherwise specified the subfolder */
+    favoriteTemplate?: string;
+    /** Template Values in a file of format 'key=value', one per line */
+    templateValuesFilePath?: string;
+    /** Use specific configuration file. Defaults to $CARGO_HOME/cargo-generate or $HOME/.cargo/cargo-generate */
+    configFile?: string;
+    /** Initialize the new repository for the given version control system */
+    versionControl?: CrateVersionControl;
+    /** Create Cargo Package in new directory */
+    createDirectory: boolean = true;
+    /** Handler used to get a value for a specific prompt. Supports async behavior. */
+    getValueHandler?: (process: child_process.ChildProcess, prompt: string) => Promise<string>;
+    constructor(name: string){
+        this.name = name;
+    }
+    /** Returns arguments for this command in array form. */
+    getArgs(): string[]{
+        let args: string[] = [];
+        args.push('generate');
+        if (this.name) { args.push(`--name`); args.push(`"${this.name}"`); }
+        if (this.forceName) { args.push(' -f'); }
+        if (this.gitRepoPath) { args.push(`--git`); args.push(`${this.gitRepoPath}`); }
+        if (this.gitBranch) { args.push(`--branch`); args.push(`${this.gitBranch}`); }
+        if (this.gitTag) { args.push(`--tag`); args.push(`${this.gitTag}`); }
+        if (this.localTemplate) { args.push(`--path`); args.push(`"${this.localTemplate}"`); }
+        if (this.favoriteTemplate) { args.push(`--favorite`); args.push(`${this.favoriteTemplate}`); }
+        if (this.templateValuesFilePath) { args.push(`--template-values-file`); args.push(`'${this.templateValuesFilePath}'`); }
+        if (this.configFile) { args.push(`--config`); args.push(`'${this.configFile}'`); }
+        if (this.versionControl !== undefined && this.versionControl !== null){ args.push(`--vcs`); args.push(`${CrateVersionControl[this.versionControl]}`); }
+        if (this.crateType !== null && this.crateType !== undefined) { args.push(`--${CrateType[this.crateType]}`); }
+        if (this.createDirectory) { args.push(`--init`); }
+        return args;
+    }
+    /** Generates command in a single string */
+    getCommand(): string{
+        let cmd = 'cargo';
+        let args = this.getArgs();
+        if (args.length > 0) { cmd += ' ' + args.join(' ');}
+        return cmd;
+    }
+    /** Executes command. Returns on completion. */
+    async execute(): Promise<void>{
+        return new Promise<void>((resolve, reject) => {
+            try{
+                let command = this.getCommand();
+                console.log(`Spawning '${command}'`);
+                let spawn = child_process.spawn('cargo', this.getArgs(), {
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                });
+                // //Handle Data Stream
+                spawn.stdout.on('data', async (data) => {
+                    console.log(`cargo generate stdout '${data}'`);
+                });
+                let laststderr: string | null = null;
+                spawn.stderr.on('data', async (err: Buffer | string) => {
+                    try{
+                        //Evaluate if Prompt
+                        if (Buffer.isBuffer(err)){
+                            err = err.toString();
+                        }
+                        else if (typeof(err) !== 'string'){
+                            console.log(`Err is type ${typeof(err)}, not string`);
+                            console.log(err);
+                            err = `${err}`;
+                        };
+                        if (err.includes(':'))
+                        {
+                            err = err.substring(0, err.indexOf(':'));
+                        }else{
+                            //Process as error    
+                            console.log(`cargo generate stderr '${err}'`);
+                            return;
+                        }
+                        //Process as Prompt
+                        if (laststderr === err || (laststderr && (err as string).startsWith(laststderr))){ return; }
+                        laststderr = err;
+                        console.log(`cargo generate stderr '${err}'`);
+                        if (this.getValueHandler)
+                        {
+                            if (!spawn.stdin.writable) {throw new Error(`Stdin Not Writable`);}
+                            let response = await this.getValueHandler(spawn, `${err}`);
+                            console.log(`Responding to cargo generate stderr with '${response}'`);
+                            spawn.stdin.write(response);
+                        }else{
+                            console.log(`Not Responding to cargo generate stdout`);
+                        }
+                        laststderr = null;
+                    }catch(err){
+                        spawn.kill();
+                        reject(err);
+                    }
+                });
+                spawn.stdin.on('drain', () => {
+                    console.log(`stdin was drained`);
+                })
+                //Handle On Close events
+                spawn.on('exit', (value) => { 
+                    if (value !== null && value !== 0) { reject(`cargo generate exited with Code ${value}`); }
+                    else { resolve(); }
+                });
+                spawn.on('close', (value) => { 
+                    if (value !== null && value !== 0) { reject(`cargo generate exited with Code ${value}`); }
+                    else { resolve(); }
+                });
+                spawn.on('error', (err) => {
+                    console.log(`cargo generate error with '${err}'`);
+                    reject(err); 
+                });
+                console.log(spawn.stdin.writableHighWaterMark);
+                console.log(`cargo generate spawn configured`);
+            }catch(err){
+                reject(err);
+            }
+        });
+    }
 }
 
 /**
